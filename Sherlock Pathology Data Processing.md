@@ -1,4 +1,4 @@
-# **Sherlock Pathology Data Processing Pipeline — README**
+# **README-Sherlock Pathology Data Processing Pipeline**
 
 
 
