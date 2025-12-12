@@ -1,4 +1,4 @@
-# **Sherlock Pathology Data Processing Pipeline — README**
+# **Sherlock Pathology Data Processing Pipeline**
 
 
 
@@ -434,7 +434,7 @@ Status is derived from Resolution:
 
 
 
-## **11. Final Schema (Step 116)**
+## **11. Final Schema**
 
 
 
