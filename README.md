@@ -48,7 +48,7 @@ Before using the code below please make sure you have the following files that a
 
 2\. Assigned Pathologist information for each case in csv. See template (allPathassignments07112024.csv)
 
-3\. Fixative information for each case. We added fixative information and case ID on each image as a image level field and exported that information from HALO. See template on how it should the final file look like. (Step3a\_output\_From\_Foundry.csv)
+3\. Fixative information for each case. We added fixative information and case ID on each image as a image level field and exported that information from HALO. See template on how it should the final file look like. (fixative.csv). g_tissueFixative is a HALO image field, getFixative is a calculated field which combines g_tissueFixative into one row per case. Fixassign is a calculated field which simplifies getFixative into 3 categories. If all images were Formalin the Fixassign is Fromalin. If they were Formalin and frozen then mixed and if they were frozen only then frozen
 
 
 
