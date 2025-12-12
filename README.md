@@ -434,7 +434,7 @@ Status is derived from Resolution:
 
 
 
-## **11. Final Schema (Step 116)**
+## **11. Final Schema**
 
 
 
