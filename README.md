@@ -1,175 +1,74 @@
 # **Sherlock Pathology Data Processing Pipeline**
 
-
-
 ## **1. Overview**
 
+This project implements a Python-based workflow for processing and adjudicating pathology data from multiple pathologists (P1, P2, and P3) in the Sherlock-Lung study.
 
+The pipeline takes pathology review data and case-level information as input, applies predefined quality control (QC) checks and adjudication rules, compares histologic classifications and differentiation grades across reviewers, and generates a standardized case-level dataset with the corresponding adjudication results.
 
-This project implements a comprehensive, rule-based pathology adjudication workflow for NSLC multi-pathologist datasets (P1, P2, P3).
+The main processing steps include:
 
-The pipeline:
+- Cleaning and standardizing input data.
+- Evaluating pathology review data and applying QC rules.
+- Comparing histologic classifications across pathologists.
+- Calculating histologic subtype totals and differentiation grades.
+- Identifying cases requiring additional review or discussion.
+- Determining the final case-level resolution and status.
+- Generating a standardized output dataset for downstream analyses.
 
+All data processing and adjudication rules are implemented in Python using pandas.
 
+### Input Data
 
-Cleans and standardizes inputs
+Before running the notebook, prepare the following three input CSV files and specify their file paths in the corresponding notebook cells.
 
+**Pathology review data (`HALO_export.csv`)**
 
+Contains the pathology review results exported from HALO in wide format. The dataset includes the histologic assessments, selected histology fields, subtype percentages, differentiation-related information, and QC-related fields for each pathologist (P1, P2, and P3).
 
-Applies pathology-specific logic
+The input data must follow the structure provided in the `HALO_export.csv` template.
 
+**Pathologist assignment data (`allPathassignments.csv`)**
 
+Contains the assigned pathologists for each case. The assignment information is used to determine which pathologists are expected to review each case and to apply the corresponding adjudication rules.
 
-Performs agreement checks (histology, subtype, differentiation)
+**Fixative information (`fixative.csv`)**
 
+Contains image-level tissue fixative information summarized at the case level. The file includes the following fields:
 
+- `g_tissueFixative`: Original fixative information recorded at the image level in HALO.
+- `getFixative`: Aggregated fixative information combining all images belonging to the same case.
+- `Fixassign`: Simplified case-level fixative classification with three possible categories:
+  - `Formalin`: All images were formalin-fixed.
+  - `Mixed`: Both formalin-fixed and frozen images were present.
+  - `Frozen`: All images were frozen.
 
-Computes totals, grades, and review flags
+The input file must follow the structure provided in the `fixative.csv` template. The notebook uses the supplied case-level fixative fields; it does not calculate them from `g_tissueFixative`.
 
+**Input data preparation:** The pipeline is independent of the data extraction method. Pathology review data and associated case-level information can be obtained through HALO exports, API queries, database queries, or other data extraction methods. Regardless of the extraction method, the resulting CSV files must conform to the corresponding input templates and contain the required fields.
 
-
-Derives case-level Resolution and Status
-
-
-
-Produces a final adjudicated dataset with 135 standardized columns
-
-
-
-All logic is implemented in Python (Pandas).
-
-
-
-Before using the code below please make sure you have the following files that are required as inputs.
-
-
-
-1\. Data is extracted from HALO in a wide format in a csv. Raw input from pathologist P1/P2/P3. See template (HALO\_export.csv)
-
-2\. Assigned Pathologist information for each case in csv. See template (allPathassignments07112024.csv)
-
-3\. Fixative information for each case. We added fixative information and case ID on each image as a image level field and exported that information from HALO. See template on how it should the final file look like. (fixative.csv). g_tissueFixative is a HALO image field, getFixative is a calculated field which combines g_tissueFixative into one row per case. Fixassign is a calculated field which simplifies getFixative into 3 categories. If all images were Formalin the Fixassign is Fromalin. If they were Formalin and frozen then mixed and if they were frozen only then frozen
-
-
-
-
-
-Please note The HALO\_export.csv was exported from NIH Data Integrated Platform(NIDAP). Database connections were created between NIDAP and HALO Database. All the tables from HALO database were imported into NIDAP as foundry objects. Pipelines were created to obtain the data from NIDAP. Data in NIDAP was synced on hourly bases. Having NIDAP is not a prerequisite. Data from HALO can be exported in multiple ways but the final format should match the template(HALO\_export.csv)
-
-1\. Using built in export function in HALO link
-
-2\. Using HALO's API (graphQL)
-
-3\. Using SQL queries from HALO's Database.
-
-
-
-
-
-
-
-## **2. Cleaning \& Standardization**
-
-
+## **2. Cleaning & Standardization**
 
 ### 2.1 Normalize missing values
 
-
-
-Treat "None", "", whitespace, and NaN as None-like.
-
-
-
-Standardize strings using a helper function (s(x)).
-
-
+The helper `s(x)` converts missing pandas values to an empty string and strips whitespace in the functions that call it. Some other cells still compare raw values or convert them with `str()`, so blank, `None`.
 
 ### 2.2 Fix histology wording
 
-
-
-The following terms are unified across all histology columns:
-
-
-
-"Carcinoid, typical" → "Carcinoid"
-
-
-
-"Carcinoid, atypical" → "Carcinoid"
-
-
-
-"Carcinoid, NOS" → "Carcinoid"
-
-
-
-Applied to:
-
-
-
-DCEG\_Shrlck\_HistoTypeSingle\_\*
-
-
-
-DCEG\_Shrlck\_HistoTypeMixed1\_\*
-
-
-
-DCEG\_Shrlck\_HistoTypeMixed2\_\*
-
-
-
-Check1\_P\*
-
-
+The values `Carcinoid, typical`, `Carcinoid, atypical`, and `Carcinoid, NOS` are replaced with `Carcinoid` in the selected single/mixed histology and `Check1_P1`/`P2`/`P3` columns.
 
 ### 2.3 Convert subtype percentage fields to integers
 
-
-
-Ensures consistent math on subtype totals and grade calculations.
-
-
+The six subtype percentages per reviewer are converted to numbers; missing or invalid values become zero before totals and grade sums are calculated.
 
 ## **3. Check1 Logic (P1, P2, P3)**
 
+Each reviewer receives a `Check1_P1`, `Check1_P2`, or `Check1_P3` classification:
 
-
-Each pathologist gets a Check1\_PX classification following:
-
-
-
-Option A
-
-
-
-Single-histology consistency rules
-
-
-
-Option B
-
-
-
-Mixed-histology combination logic
-
-
-
-Option C
-
-
-
-Interprets “Not Evaluable” cases
-
-
-
-NaN-safe string comparisons
-
-
-
-All .strip() calls and None/NaN handling prevent errors.
-
+- **Option A:** uses the selected single-histology value and checks it against mixed-histology fields.
+- **Option B:** combines the two mixed-histology values, with some consistency checks.
+- **Option C:** marks the not-evaluable option `QC FAIL`.
+- If P3 has not been assigned, `Check1_P3` is `P3 not assigned`.
 
 
 ## **4. Adenocarcinoma Filter**
@@ -193,342 +92,93 @@ Otherwise → "P1 ; P2 ; P3"
 This drives decision rules for histology and differentiation.
 
 
-
 ## **5. Primary Histology Comparison**
 
-
-
-Outputs:
-
-
-
-"all\_agree(2)"
-
-
-
-"all\_agree(3)"
-
-
-
-"no\_agreement(additional review)"
-
-
-
-Rules compare:
-
-
-
-Check1 results
-
-
-
-P3 involvement
-
-
-
-Adenocarcinoma matching
-
-
+`Primary_histology_comparison` compares `Check1` values and P3 assignment and returns `all_agree(2)`, `all_agree(3)`, or `no_agreement(additional review)`. `header_comparison_test` separately compares the reviewers' single-versus-mixed selections. Both fields feed the Resolution rules.
 
 ## **6. Subtype Total Computation**
 
-Totals for each pathologist:
+For each reviewer:
 
-getTotal\_subtype\_p1 = lepidic + acinar + pap + mpap + solid + crib
-
-getTotal\_subtype\_p2 = same variables
-
-getTotal\_subtype\_p3 = same variables
-
-
-
-
+`getTotal_subtype_pX = lepidic + acinar + papillary + micropapillary + solid + cribriform`
 
 Subtype totals must equal 100, otherwise → "Fix subtype".
 
 
+## **7. High Grade & Differentiation**
 
-## **7. High Grade \& Differentiation**
+High-grade sum for each reviewer:
 
-High-grade calculation:
+`High_gradePX = micropapillary + cribriform + solid`
 
-High\_gradePX = mpap + crib + solid
+The reviewer differentiation rules are:
 
+- High-grade sum ≥ 20: `poorly`.
+- High-grade sum < 20 and lepidic > max(acinar, papillary): `well`.
+- High-grade sum < 20 and lepidic < max(acinar, papillary): `moderate`.
+- High-grade sum < 20 and lepidic = max(acinar, papillary): `None` (exported as blank).
 
+The calculated grade is retained only when the reviewer's `Check1` is exactly `Adenocarcinoma, non-mucinous`; otherwise the notebook writes `Not calculated1`, `Not calculated2`, or `Not calculated3`.
 
-Differentiation:
+`combine_differentiation` joins the three reviewer values. `Differentiation_result1` returns a grade seen at least twice (`well`, `moderate`, or `poorly`); when at least two values say `Not calculated`, it returns `Not Calculated`; otherwise it returns `no_agreement`. Two later case-ID mapping steps can replace `Differentiation_result`.
 
-
-
-Rules:
-
-
-
-high\_grade >= 20 → "poorly"
-
-
-
-If not high-grade:
-
-
-
-lepidic ≥ (acinar+pap) → "well"
-
-
-
-else → "moderate"
-
-
-
-Combined differentiation:
-
-
-
-combine\_differentiation = "DiffP1,DiffP2,DiffP3"
-
-
-
-Differentiation\_result1
-
-
-
-≥2 “well” → well
-
-
-
-≥2 “moderate” → moderate
-
-
-
-≥2 “poorly” → poorly
-
-
-
-≥2 “Not Calculated” → Not Calculated
-
-
-
-else → no\_agreement
-
-
-
-Hard-coded overrides
-
-
-
-Specific case IDs override the computed differentiation value.
-
-
+`Compare_differentiation` compares reviewer values after converting them to strings.
 
 ## **8. Discussion Flags**
 
+`Diss_P1`, `Diss_P2`, and `Diss_P3` are 1 only when the corresponding `DCEG_Shrlck_add_discussion_PX` field is `Yes`, ignoring case and spaces. A blank or `No` produces 0.
 
-
-Binary indicators:
-
-
-
-Diss\_P1, Diss\_P2, Diss\_P3
-
-
-
-
-
-NumberofPath = Diss\_P1 + Diss\_P2 + Diss\_P3
-
-
+`NumberofPath = Diss_P1 + Diss_P2 + Diss_P3` counts **discussion flags**, not the number of assigned pathologists. After the other calculated Resolution checks, a `Yes` flag from any reviewer changes the calculated Resolution to `Discuss`.
 
 ## **9. Resolution Engine**
 
-
-
-The most complex rule set in the pipeline.
-
-Determines final case adjudication based on:
-
-
-
-✔ QC FAIL conditions
-
-✔ P3 None-like vs Non-None
-
-✔ Pending review
-
-✔ Histology agreement \& conflict
-
-✔ Differentiation agreement
-
-✔ Adenocarcinoma matching
-
-✔ Subtype totals
-
-✔ Assign P3 logic
-
-✔ Multi-pathologist agreement
-
-✔ Overrides for specific names
-
-
-
-Possible outputs include:
-
-
-
-Complete
-
-
-
-Assign P3
-
-
-
-Fix Histology
-
-
-
-Fix subtype
-
-
-
-Not Adenocarcinoma
-
-
-
-P1/P2 Diff.
-
-
-
-P1/P2/P3(atleast2) Diff.
-
-
-
-Primary Histology match...
-
-
-
-QC FAIL
-
-
-
-Pending review(P1/P2/P3)
-
-
-
-no category
-
-
-
-Discuss (director override)
-
-
+The notebook calculates Resolution from `Check1` QC failures, reviewer completion, P3 assignment, histology and differentiation agreement, subtype totals, and adenocarcinoma classification. Possible calculated values include `Complete`, `Assign P3`, `Fix Histology`, `Fix subtype`, `Not Adenocarcinoma`, `P1/P2 Diff.`, `P1/P2/P3 Diff.`, `No agreement`, `Primary Histology match; diff. disagreement`, `QC FAIL`, `Pending review(...)`, and `Discuss`.
 
 
 
 ## **10. Status Classification**
 
-
-
-Status is derived from Resolution:
-
-
-
+Status is derived from Resolution
 
 
 ## **11. Final Schema**
 
+The notebook defines a list of **123 selected columns** in a fixed order. It builds `df_final` using only selected columns actually present in `df`, silently omitting a selected field if it is missing.
 
-
-The output is column-selected and ordered into a strict schema of 135 fields, matching Spark/Foundry definitions.
-
-
-
-df\_final = df\[selected\_columns]
-
-
-
-
-
-This ensures consistency across environments.
-
-
-
-
+The last formatting cell copies `df_final` and adds an `exclude` field, so the written file has **up to 124 columns** (123 selected plus `exclude`). The extra field does not remove rows.
 
 ## **12. Sorting Rules**
 
-
-
-Sort by "name" ascending
-
-
-
-Sort by "Status" ascending
-
-
-
-df\_final = df\_final.sort\_values(by=\['Status', 'name'])
-
-
-
-
-
-
+The final dataset is sorted by name(CaseID) and then Status, both ascending, before export.”
 
 ## **13. Outputs**
 
+The notebook writes the following CSV "Pythonoutput.csv" in its configured working directory.
+
 Main deliverables:
 
-
-
-df\_final → adjudicated master dataset
-
-
+df_final → adjudicated master dataset
 
 Resolution + Status → final case disposition
 
+Differentiation_result → final grade summary
 
-
-Differentiation\_result → final grade summary
-
-
-
-Primary\_histology\_comparison → agreement logic
-
-
+Primary_histology_comparison → agreement logic
 
 QC fields (totals, high-grade, discussion flags)
 
-
-
 Optional diff report when comparing against a baseline
-
-
 
 Raw data
 
-
-
-
-
 ## **14. Notes**
-
-
 
 Pipeline is deterministic; re-running yields identical outputs.
 
-
-
 Overrides for specific cases must be updated manually if names change.
-
-
 
 Resolution logic heavily depends on correct upstream steps.
 
-
-
 P3 logic is sensitive to blank/None distinctions (handled consistently).
 
-
-
 All string comparisons normalized via .strip() and lowercase where needed.
-
